@@ -1,0 +1,52 @@
+@echo off
+
+:: Need to run those commands first because... we don't know why...
+SETLOCAL enabledelayedexpansion
+for /F %%i in ('docker image ls matthieujabbour/dev-env:latest -q') do set ImageId=%%i
+for /F %%j in ('docker ps --filter "name=dev-env" -q') do set ContainerId=%%j
+
+:: On very first run, we ask user for the directory to use for persistant storage.
+set "File=%userprofile%\.dev"
+if exist !File! (
+  set /a count=0
+  for /F "tokens=* delims=" %%a in ('Type "!File!"') do (
+    Set /a count+=1
+    Set "output[!count!]=%%a"
+  )
+  Set "HomePath=!output[1]!"
+  Set "Password=!output[2]!"
+) else (
+  set /P HomePath="Please specify the full path to the directory to use as developer's home: "
+  echo !HomePath!>> "!File!"
+  set /P Pasword="Please specify the password you will use to protect your developer's home: "
+  echo !Pasword!>> "!File!"
+  :: Adding `dev.docker.io` as a known domain...
+  echo 127.0.0.1       dev.docker.io>> "%WINDIR%\System32\drivers\etc\hosts"
+)
+:: Checking if directory is valid...
+if not exist !HomePath! (
+  echo "Given directory full path is not valid - exiting..."
+) else (
+  :: User can request an image update using the `--update` argument.
+  if "%1" == "--update" (
+    echo "Updating docker image - this can take a few minutes..."
+    if NOT "!ContainerId!" == "" (
+      docker kill "!ContainerId!"
+      set ContainerId=
+    )
+    docker rmi "!ImageId!" --force
+    docker pull matthieujabbour/dev-env:latest
+    echo "Done!"
+  )
+  if NOT "!ContainerId!" == "" (
+    docker exec -it "!ContainerId!" bash -c "source ~/.bash_profile && bash"
+  ) else (
+    echo "Starting docker container - this can take a few minutes..."
+    docker run -it ^
+      -e PASSWORD=%Password% ^
+      -p 8080:8080 -p 8081:8081 -p 3306:3306 -p 3000:3000 ^
+      --rm --name dev-env ^
+      -v %HomePath%:/home/developer:cached ^
+      matthieujabbour/dev-env:latest
+  )
+)

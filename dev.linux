@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# fail hard
+set -o pipefail
+# fail harder
+set -eu
+
+# On very first run, we ask user for the directory to use for persistant storage.
+if [ ! -e ~/.dev ]; then
+  read -p "Please specify the full path to the directory to use as developer's home: " home_path
+  echo $home_path >> ~/.dev
+  read -p "Please specify the password you will use to protect your developer's home: " password
+  echo $password >> ~/.dev
+
+  # Adding `dev.docker.io` as a known domain...
+  dev_host=$(sudo cat /etc/hosts | grep "dev.docker.io" || true)
+  if [ -z "$dev_host" ]; then
+    echo "127.0.0.1       dev.docker.io" | sudo tee -a /etc/hosts
+  fi
+
+  # Adding MySQL user to host...
+  id -u mysql &>/dev/null || useradd mysql
+else
+  while read -r home_path; do
+    read -r password
+    break
+  done < ~/.dev
+fi
+
+# Checking if directory is valid...
+if [ ! -e $home_path ]; then
+  echo "Given directory full path is not valid - exiting..."
+  exit
+fi
+
+image_id=$(docker image ls matthieujabbour/dev-env:latest -q)
+container_id=$(docker ps --filter "name=dev-env" -q)
+
+# User can request an image update using the `--update` argument.
+if [ ! $# -eq 0 ]; then
+  if [ "$1" == "--update" ]; then
+    echo "Updating docker image - this can take a few minutes..."
+    if [ "$container_id" != "" ]; then
+      docker kill $container_id &>/dev/null
+      container_id=""
+    fi
+    docker rmi $image_id --force &>/dev/null
+    docker pull matthieujabbour/dev-env:latest &>/dev/null
+    echo "Done!"
+  fi
+fi
+
+if [ "$container_id" != "" ]; then
+  docker exec -it $container_id /sbin/start
+else
+  echo "Starting docker container - this can take a few minutes..."
+  docker run -it \
+    -u $(id -u ${USER}):$(id -g ${USER}) \
+    -e PASSWORD=$password \
+    -p 8080:8080 -p 8081:8081 -p 3306:3306 -p 3000:3000 \
+    --rm --name dev-env \
+    -v $home_path:/home/developer:cached \
+    -v=/etc/group:/etc/group:ro \
+    -v=/etc/passwd:/etc/passwd:ro \
+    -v=/etc/shadow:/etc/shadow:ro \
+    matthieujabbour/dev-env:latest
+fi
