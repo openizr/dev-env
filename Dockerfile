@@ -11,7 +11,10 @@ ENV PORT=8081
 RUN groupadd -r developers \
   && useradd -r -g developers developer \
   && usermod -aG sudo developer \
-  && echo "developer:docker" | chpasswd
+  && echo "developer:docker" | chpasswd \
+  && mkdir -p /home/developer \
+  && chown -R developer:developers /home/developer \
+  && chmod -R 770 /home/developer
 
 # Installing common utilities...
 RUN apt-get update \
@@ -74,7 +77,8 @@ COPY ./home/* /home/
 # Adding main commands...
 COPY ./sbin/* /sbin/
 
-RUN mkdir -p /home/developer
+USER developer
+
 WORKDIR /home/developer/
 
 EXPOSE 3000 3306 8080 8081
