@@ -7,6 +7,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Makes `heroku local` always start on the same port...
 ENV PORT=8081
 
+# Adding default user...
+RUN groupadd -r developers \
+  && useradd -r -g developers developer \
+  && usermod -aG sudo developer \
+  && echo "developer:docker" | chpasswd
+
 # Installing common utilities...
 RUN apt-get update \
   && apt-get install -y \
