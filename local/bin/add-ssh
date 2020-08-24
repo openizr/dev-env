@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# fail hard
+set -o pipefail
+# fail harder
+set -eu
+
+# Permanently adding ssh passphrase...
+eval `ssh-agent -s` &>/dev/null
+ssh-add

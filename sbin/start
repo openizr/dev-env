@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# fail hard
+set -o pipefail
+# fail harder
+set -eu
+
+# Relocating home directory, no matter which logged into host (this is important)...
+export HOME=/home/developer
+
+cp /home/.bashrc ~/.bashrc
+source ~/.bash_profile
+
+# Alias definitions.
+if [ -f ~/.bash_aliases ]; then
+    . ~/.bash_aliases
+fi
+
+bash
